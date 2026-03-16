@@ -128,35 +128,47 @@ export async function updateConfig(json) {
  * @returns {{ disconnect: () => void }}         - Call disconnect() to clean up
  */
 export function connectWebSocket(onMessage, onError) {
-    if (USE_MOCK) {
-        // Mock emits every 1 second just like the real backend
-        onMessage(randomMockPacket());
-        const intervalId = setInterval(() => {
-            onMessage(randomMockPacket());
-        }, 1000);
+    let ws;
+    let isIntentionalDisconnect = false;
 
-        return { disconnect: () => clearInterval(intervalId) };
+    function connect() {
+        ws = new WebSocket("ws://localhost:8080/ws/telemetry");
+
+        ws.onopen = () => console.info('🟢 [WS] Connected to 8080');
+        
+        ws.onmessage = (event) => {
+            try {
+                const packet = JSON.parse(event.data);
+                onMessage(packet);
+            } catch {
+                console.warn('[WS] Non-JSON message:', event.data);
+            }
+        };
+        
+        ws.onerror = (err) => {
+            console.error('⚠️ [WS] Error', err);
+            onError?.(err);
+        };
+        
+        ws.onclose = (evt) => {
+            console.warn('🔴 [WS] Closed', evt.code);
+            // If we didn't manually close it, try to reconnect after 2 seconds
+            if (!isIntentionalDisconnect) {
+                console.info('⏳ [WS] Attempting to reconnect in 2s...');
+                setTimeout(connect, 2000);
+            }
+        };
     }
 
-    const ws = new WebSocket(WS_URL);
+    // Start the initial connection
+    connect();
 
-    ws.onopen = () => console.info('[WS] Connected to', WS_URL);
-    ws.onmessage = (event) => {
-        try {
-            const packet = JSON.parse(event.data);
-            onMessage(packet);
-        } catch {
-            console.warn('[WS] Non-JSON message:', event.data);
-        }
+    return { 
+        disconnect: () => {
+            isIntentionalDisconnect = true;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+        } 
     };
-    ws.onerror = (err) => {
-        console.error('[WS] Error', err);
-        onError?.(err);
-    };
-    ws.onclose = (evt) => {
-        console.warn('[WS] Closed', evt.code, evt.reason);
-        onError?.({ type: 'close', code: evt.code });
-    };
-
-    return { disconnect: () => ws.close() };
 }

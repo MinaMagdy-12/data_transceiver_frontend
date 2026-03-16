@@ -1,25 +1,18 @@
-import { useEffect, useState } from 'react';
 import { useDevice } from '../context/DeviceContext';
 
 export default function TelemetryReport() {
     const { telemetry, resetTelemetry } = useDevice();
-    const [elapsed, setElapsed] = useState(0);
 
-    // Update elapsed time every second
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setElapsed(Math.floor((Date.now() - telemetry.startTime) / 1000));
-        }, 1000);
-        return () => clearInterval(interval);
-    }, [telemetry.startTime]);
-
-    const txAttempts = telemetry.txAttempts;
-    const packetDrops = telemetry.packetDrops;
-    const totalBytes = telemetry.totalBytes;
-    const avgRtt = telemetry.rttCount > 0 ? (telemetry.totalRttMs / telemetry.rttCount) / 1000 : 0; // seconds
-
-    const goodputBps = elapsed > 0 ? totalBytes / elapsed : 0;
-    const dropRate = txAttempts > 0 ? (packetDrops / txAttempts) * 100 : 0;
+    // Map directly to the backend's payload fields
+    const {
+        elapsed = 0,
+        totalBytes = 0,
+        goodputBps = 0,
+        txAttempts = 0,
+        packetDrops = 0,
+        pdr = 0,
+        avgRtt = 0
+    } = telemetry;
 
     return (
         <div className="glass-card p-5 flex flex-col gap-4 h-full" style={{ minHeight: '200px' }}>
@@ -55,11 +48,12 @@ export default function TelemetryReport() {
                 background: 'rgba(0,0,0,0.2)', borderRadius: '8px',
                 border: '1px solid var(--border)', padding: '16px',
             }}>
-                <MetricBox label="Elapsed Time" value={`${elapsed} s`} />
+                {/* Notice how much cleaner this is now! */}
+                <MetricBox label="Elapsed Time" value={`${elapsed.toFixed(1)} s`} />
                 <MetricBox label="Total Bytes" value={`${fmtBytes(totalBytes)}`} />
                 <MetricBox label="Goodput" value={`${goodputBps >= 1024 ? (goodputBps / 1024).toFixed(1) + ' KBps' : Math.floor(goodputBps) + ' Bps'}`} />
                 <MetricBox label="TX Attempts" value={txAttempts.toString()} />
-                <MetricBox label="Packet Drops" value={`${packetDrops} (${dropRate.toFixed(1)}%)`} isDanger={dropRate > 10} />
+                <MetricBox label="Packet Drops" value={`${packetDrops}%`} isDanger={pdr > 10} />
                 <MetricBox label="Average RTT" value={avgRtt > 0 ? `${avgRtt.toFixed(3)} s/pkt` : '--'} />
             </div>
         </div>

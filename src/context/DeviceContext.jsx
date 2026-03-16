@@ -45,7 +45,7 @@ function reducer(state, action) {
     switch (action.type) {
         case 'WS_PACKET': {
             const data = action.payload; // This is the dictionary from Python
-
+            console.log(data)
             // Log activity to the UI terminal
             const logMsg = `[${data.timestamp}] Telemetry update: ${data.goodputKbps} kbps, PDR: ${data.pdr}%`;
 
@@ -127,15 +127,20 @@ function reducer(state, action) {
             return { ...state, txQueue: [] };
         case 'CLEAR_LOG':
             return { ...state, logLines: [] };
+        // ✅ THE FIX: Zero out the new backend-aligned fields
         case 'RESET_TELEMETRY':
             return {
-                ...state, telemetry: {
-                    startTime: Date.now(),
+                ...state, 
+                telemetry: {
+                    timestamp: new Date().toLocaleTimeString(),
+                    elapsed: 0,
                     totalBytes: 0,
+                    goodputBps: 0,
+                    goodputKbps: 0,
                     txAttempts: 0,
                     packetDrops: 0,
-                    totalRttMs: 0,
-                    rttCount: 0,
+                    pdr: 0,
+                    avgRtt: 0,
                 }
             };
         default:
