@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { updateConfig } from '../services/api';
 import { useDevice } from '../context/DeviceContext';
 import { useToast } from '../context/ToastContext';
@@ -6,51 +6,95 @@ import { useToast } from '../context/ToastContext';
 // 1. Map your EXACT radio.conf fields here
 const SHARED_FIELDS =[
     { key: 'frequency', label: 'Frequency', unit: 'MHz', min: 1, max: 6000, step: 0.001 },
-    { key: 'sampleRate', label: 'Sample Rate', unit: 'Msps', min: 0.1, max: 20, step: 0.1 },
-    { key: 'sps', label: 'Samples/Symbol', unit: '', min: 1, max: 1024, step: 1 },
+    { key: 'sample_rate', label: 'Sample Rate', unit: 'Msps', min: 0.1, max: 20, step: 0.1 },
+    { key: 'samples_per_symbol', label: 'Samples/Symbol', unit: '', min: 1, max: 1024, step: 1 },
     { key: 'timeout', label: 'Timeout', unit: 's', min: 1, max: 120, step: 1 },
 ];
 
 const TX_FIELDS =[
-    { key: 'txGain', label: 'TX Gain', unit: 'dB', min: 0, max: 47, step: 1 },
-    { key: 'chunkSize', label: 'Chunk Size', unit: 'B', min: 16, max: 8192, step: 16 },
-    { key: 'maxResend', label: 'Max Resend', unit: '', min: 0, max: 10, step: 1 },
-    { key: 'transCount', label: 'Trans Count', unit: '', min: 1, max: 100, step: 1 },
+    { key: 'tx_gain', label: 'TX Gain', unit: 'dB', min: 0, max: 47, step: 1 },
+    { key: 'chunk_size', label: 'Chunk Size', unit: 'B', min: 16, max: 8192, step: 16 },
+    { key: 'max_resend', label: 'Max Resend', unit: '', min: 0, max: 10, step: 1 },
+    { key: 'trans_count', label: 'Trans Count', unit: '', min: 1, max: 100, step: 1 },
 ];
 
 const RX_FIELDS =[
-    { key: 'rxGain', label: 'RX Gain', unit: 'dB', min: 0, max: 62, step: 1 },
-    { key: 'captureSeconds', label: 'Capture Secs', unit: 's', min: 1, max: 3600, step: 1 },
+    { key: 'rx_gain', label: 'RX Gain', unit: 'dB', min: 0, max: 62, step: 1 },
+    { key: 'capture_seconds', label: 'Capture Secs', unit: 's', min: 1, max: 3600, step: 1 },
 ];
 
 export default function TransceiverConfigPanel() {
     const { txConfig, rxConfig, setTxConfig, setRxConfig, addLog } = useDevice();
     const { addToast } = useToast();
-
     // 2. Initialize with your EXACT radio.conf defaults if context is empty
     const [vals, setVals] = useState({
         // Shared (Note: 2300000000 Hz = 2300 MHz, 2000000 Hz = 2 Msps)
         frequency: String(txConfig?.frequency || '2300'),
-        sampleRate: String(txConfig?.sampleRate || '2'),
-        sps: String(txConfig?.sps || '50'),
+        sample_rate: String(txConfig?.sample_rate || '2'),
+        samples_per_symbol: String(txConfig?.samples_per_symbol || '50'),
         timeout: String(txConfig?.timeout || '10'),
         modulation: txConfig?.modulation || 'OFDM',
         
         // TX
         txSerial: txConfig?.txSerial || '0000000000000000f77c60dc29417dc3',
-        txGain: String(txConfig?.txGain || '30'),
-        chunkSize: String(txConfig?.chunkSize || '2048'),
-        maxResend: String(txConfig?.maxResend || '5'),
-        transCount: String(txConfig?.transCount || '5'),
+        tx_gain: String(txConfig?.tx_gain || '30'),
+        chunk_size: String(txConfig?.chunk_size || '2048'),
+        max_resend: String(txConfig?.max_resend || '5'),
+        trans_count: String(txConfig?.trans_count || '5'),
         
         // RX
         rxSerial: rxConfig?.rxSerial || '000000000000000075b068dc30792007',
-        rxGain: String(rxConfig?.rxGain || '20'),
-        captureSeconds: String(rxConfig?.captureSeconds || '2'),
+        rx_gain: String(rxConfig?.rx_gain || '20'),
+        capture_seconds: String(rxConfig?.capture_seconds || '2'),
     });
 
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+  const fetchData = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/config_init');
+      console.log(response.status)
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      let data = await response.json();
+      data = JSON.parse(data);
+      console.log(typeof data)
+      
+      setVals(prev => {
+        // Start with previous values as base (safety net)
+        // Then override with server data
+        // Finally ensure EVERY field used in the form is a string (never undefined)
+        return {
+          // Shared
+          frequency:           String(parseInt(data.frequency,10) / (1000000)           ?? '2322'),
+          sample_rate:         String(parseInt(data.sample_rate,10) / (1000000)        ?? prev.sample_rate ?? '2'),
+          samples_per_symbol:  String(data.samples_per_symbol  ?? prev.samples_per_symbol  ?? '50'),
+          timeout:             String(data.timeout             ?? prev.timeout             ?? '10'),
+          modulation:          String(data.modulation          ?? prev.modulation          ?? 'OFDM'),
+
+          // TX
+          txSerial:            String(data.txSerial            ?? prev.txSerial            ?? '0000000000000000f77c60dc29417dc3'),
+          tx_gain:             String(data.tx_gain             ?? prev.tx_gain             ?? '30'),
+          chunk_size:          String(data.chunk_size          ?? prev.chunk_size          ?? '2048'),
+          max_resend:          String(data.max_resend          ?? prev.max_resend          ?? '5'),
+          trans_count:         String(data.trans_count         ?? prev.trans_count         ?? '5'),
+
+          // RX
+          rxSerial:            String(data.rxSerial            ?? prev.rxSerial            ?? '000000000000000075b068dc30792007'),
+          rx_gain:             String(data.rx_gain             ?? prev.rx_gain             ?? '20'),
+          capture_seconds:     String(data.capture_seconds     ?? prev.capture_seconds     ?? '2'),
+        };
+      });
+    } catch (err) {
+      console.log(`ERROR: Fetching Radio.conf ${err}`);
+      // Optionally show toast / keep old values
+    }
+  };
+
+  fetchData();
+}, []);
 
     function validate() {
         const errs = {};
@@ -77,20 +121,20 @@ export default function TransceiverConfigPanel() {
         // Build payload targeting exactly what the backend needs
         const payload = {
             frequency: parseFloat(vals.frequency),
-            sampleRate: parseFloat(vals.sampleRate),
-            sps: parseInt(vals.sps, 10),
+            sample_rate: parseFloat(vals.sample_rate),
+            samples_per_symbol: parseInt(vals.samples_per_symbol, 10),
             timeout: parseInt(vals.timeout, 10),
             modulation: vals.modulation,
             
             txSerial: vals.txSerial.trim(),
-            txGain: parseInt(vals.txGain, 10),
-            chunkSize: parseInt(vals.chunkSize, 10),
-            maxResend: parseInt(vals.maxResend, 10),
-            transCount: parseInt(vals.transCount, 10),
+            tx_gain: parseInt(vals.tx_gain, 10),
+            chunk_size: parseInt(vals.chunk_size, 10),
+            max_resend: parseInt(vals.max_resend, 10),
+            trans_count: parseInt(vals.trans_count, 10),
             
             rxSerial: vals.rxSerial.trim(),
-            rxGain: parseInt(vals.rxGain, 10),
-            captureSeconds: parseInt(vals.captureSeconds, 10),
+            rx_gain: parseInt(vals.rx_gain, 10),
+            capture_seconds: parseInt(vals.capture_seconds, 10),
         };
 
         try {
@@ -98,18 +142,18 @@ export default function TransceiverConfigPanel() {
             
             // Update Context to reflect changes across the app
             setTxConfig(p => ({
-                ...p, frequency: payload.frequency, sampleRate: payload.sampleRate, sps: payload.sps, timeout: payload.timeout,
-                modulation: payload.modulation, txGain: payload.txGain, chunkSize: payload.chunkSize, 
-                maxResend: payload.maxResend, transCount: payload.transCount, txSerial: payload.txSerial
+                ...p, frequency: payload.frequency, sample_rate: payload.sample_rate, samples_per_symbol: payload.samples_per_symbol, timeout: payload.timeout,
+                modulation: payload.modulation, tx_gain: payload.tx_gain, chunk_size: payload.chunk_size, 
+                max_resend: payload.max_resend, trans_count: payload.trans_count, txSerial: payload.txSerial
             }));
             
             setRxConfig(p => ({
-                ...p, frequency: payload.frequency, sampleRate: payload.sampleRate, sps: payload.sps, timeout: payload.timeout,
-                modulation: payload.modulation, rxGain: payload.rxGain, captureSeconds: payload.captureSeconds, rxSerial: payload.rxSerial
+                ...p, frequency: payload.frequency, sample_rate: payload.sample_rate, samples_per_symbol: payload.samples_per_symbol, timeout: payload.timeout,
+                modulation: payload.modulation, rx_gain: payload.rx_gain, capture_seconds: payload.capture_seconds, rxSerial: payload.rxSerial
             }));
 
             addToast(`Transceiver config saved — ${vals.frequency} MHz`, 'success');
-            addLog(`Config updated → freq: ${vals.frequency} MHz, TX Gain: ${vals.txGain} dB, RX Gain: ${vals.rxGain} dB`);
+            addLog(`Config updated → freq: ${vals.frequency} MHz, TX Gain: ${vals.tx_gain} dB, RX Gain: ${vals.rx_gain} dB`);
         } catch (err) {
             const msg = err?.response?.data?.message ?? err?.message ?? 'Unknown error';
             addToast(`Config failed: ${msg}`, 'error');

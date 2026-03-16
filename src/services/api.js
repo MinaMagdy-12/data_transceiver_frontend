@@ -14,7 +14,7 @@ export const USE_MOCK = false;
 
 // ── Backend base URL (only used when USE_MOCK = false) ────────────────────────
 const BASE_URL = 'http://localhost:8080';
-const WS_URL = 'ws://localhost:8080/ws';
+const WS_URL = 'ws://localhost:8080/ws/telemetry';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -25,22 +25,16 @@ const MOCK_STATUSES = ['idle', 'transmitting', 'error', 'idle', 'transmitting'];
 const MOCK_DEVICES = ['rf_1', 'rf_2'];
 
 function randomMockPacket() {
-    const status = MOCK_STATUSES[Math.floor(Math.random() * MOCK_STATUSES.length)];
-    const hasRx = Math.random() < 0.4;
-    const isAck = Math.random() > 0.2; // 80% chance of ACK
     return {
-        device_id: MOCK_DEVICES[Math.floor(Math.random() * MOCK_DEVICES.length)],
-        status,
-        timestamp: new Date().toISOString(),
-        rtt_ms: hasRx ? Math.floor(20 + Math.random() * 150) : 0,
-        ...(hasRx && {
-            rx_bytes: Math.floor(512 + Math.random() * 65024),
-            ack: isAck
-        }),
-        // simulate packet drop without rx if transmitting
-        ...((status === 'transmitting' && !hasRx) && {
-            ack: isAck
-        })
+        timestamp: new Date().toLocaleTimeString(),
+        elapsed: parseFloat((Math.random() * 100).toFixed(2)),
+        totalBytes: Math.floor(Math.random() * 50000),
+        goodputBps: parseFloat((Math.random() * 15000).toFixed(2)),
+        goodputKbps: parseFloat((Math.random() * 15).toFixed(2)),
+        txAttempts: Math.floor(Math.random() * 200),
+        packetDrops: Math.floor(Math.random() * 10),
+        pdr: parseFloat((Math.random() * 5).toFixed(2)),
+        avgRtt: parseFloat((Math.random() * 0.15).toFixed(3))
     };
 }
 
@@ -135,15 +129,13 @@ export async function updateConfig(json) {
  */
 export function connectWebSocket(onMessage, onError) {
     if (USE_MOCK) {
-        // Immediately emit one packet, then every 5 seconds
+        // Mock emits every 1 second just like the real backend
         onMessage(randomMockPacket());
         const intervalId = setInterval(() => {
             onMessage(randomMockPacket());
-        }, 5000);
+        }, 1000);
 
-        return {
-            disconnect: () => clearInterval(intervalId),
-        };
+        return { disconnect: () => clearInterval(intervalId) };
     }
 
     const ws = new WebSocket(WS_URL);
@@ -166,7 +158,5 @@ export function connectWebSocket(onMessage, onError) {
         onError?.({ type: 'close', code: evt.code });
     };
 
-    return {
-        disconnect: () => ws.close(),
-    };
+    return { disconnect: () => ws.close() };
 }

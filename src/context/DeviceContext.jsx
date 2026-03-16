@@ -15,7 +15,7 @@ const initialState = {
     logLines: [],
     connected: false,
     // TX config (HackRF transmit side)
-    txConfig: { frequency: 915, gain: 20, sampleRate: 2, serial: '', sps: 8, chunkSize: 256, maxResend: 3, modulation: 'QPSK', transCount: 1 },
+    txConfig: { frequency: 977, gain: 20, sampleRate: 2, serial: '', sps: 8, chunkSize: 256, maxResend: 3, modulation: 'QPSK', transCount: 1 },
     // RX config (HackRF receive side)
     rxConfig: { frequency: 433, lnaGain: 16, vgaGain: 20, sampleRate: 2, captureSeconds: 10, sps: 8, modulation: 'QPSK' },
     // Queues
@@ -26,12 +26,15 @@ const initialState = {
     txRate: 0,
     // Telemetry Metrics
     telemetry: {
-        startTime: Date.now(),
+        timestamp: '',
+        elapsed: 0,
         totalBytes: 0,
+        goodputBps: 0,
+        goodputKbps: 0,
         txAttempts: 0,
         packetDrops: 0,
-        totalRttMs: 0,
-        rttCount: 0,
+        pdr: 0,
+        avgRtt: 0,
     }
 };
 
@@ -41,54 +44,37 @@ let _queueId = 1;
 function reducer(state, action) {
     switch (action.type) {
         case 'WS_PACKET': {
-            const { device_id, status, timestamp, rx_bytes, ack } = action.payload;
-            const label = `[${new Date(timestamp).toLocaleTimeString()}] ${device_id} → status: ${status}`;
-            // EMA for RX rate (WS mock fires every ~5 s → bytes/s = rx_bytes / 5)
-            const newRxRate = rx_bytes != null
-                ? Math.round(state.rxRate * 0.6 + (rx_bytes / 5) * 0.4)
-                : Math.round(state.rxRate * 0.85);
-            // TX rate: ramp when transmitting, decay otherwise
-            const newTxRate = status === 'transmitting'
-                ? Math.round(state.txRate * 0.5 + (12000 + Math.random() * 40000) * 0.5)
-                : Math.round(state.txRate * 0.75);
-            // RX queue
-            const rxQueue = rx_bytes != null
-                ? [
-                    ...state.rxQueue.slice(-49),
-                    {
-                        id: action.id ?? _queueId++,
-                        device_id,
-                        bytes: rx_bytes,
-                        timestamp: new Date(timestamp).toLocaleTimeString(),
-                        status: 'received',
-                        ack,
-                    },
-                ]
-                : state.rxQueue;
-            // Telemetry updates
-            const isDrop = ack === false;
-            const hasTx = status === 'transmitting';
-            const rttMs = action.payload.rtt_ms || 0;
+            const data = action.payload; // This is the dictionary from Python
 
-            const telemetry = {
-                ...state.telemetry,
-                totalBytes: state.telemetry.totalBytes + (rx_bytes || 0),
-                txAttempts: state.telemetry.txAttempts + (hasTx ? 1 : 0),
-                packetDrops: state.telemetry.packetDrops + (isDrop ? 1 : 0),
-                totalRttMs: state.telemetry.totalRttMs + rttMs,
-                rttCount: state.telemetry.rttCount + (rttMs > 0 ? 1 : 0),
-            };
+            // Log activity to the UI terminal
+            const logMsg = `[${data.timestamp}] Telemetry update: ${data.goodputKbps} kbps, PDR: ${data.pdr}%`;
+
+            // Note: Since the backend only sends telemetry now (not per-packet info),
+            // we will derive the overall status based on if attempts are happening.
+            const isTransmitting = data.goodputBps > 0 || data.txAttempts > state.telemetry.txAttempts;
 
             return {
                 ...state,
-                status,
-                deviceId: device_id,
                 connected: true,
-                rxQueue,
-                rxRate: newRxRate,
-                txRate: newTxRate,
-                logLines: [...state.logLines.slice(-199), label],
-                telemetry,
+                status: isTransmitting ? 'transmitting' : 'idle',
+                logLines:[...state.logLines.slice(-199), logMsg],
+                
+                // 2. INGEST THE EXACT PAYLOAD FROM BACKEND
+                telemetry: {
+                    timestamp: data.timestamp || '',
+                    elapsed: data.elapsed || 0,
+                    totalBytes: data.totalBytes || 0,
+                    goodputBps: data.goodputBps || 0,
+                    goodputKbps: data.goodputKbps || 0,
+                    txAttempts: data.txAttempts || 0,
+                    packetDrops: data.packetDrops || 0,
+                    pdr: data.pdr || 0,
+                    avgRtt: data.avgRtt || 0,
+                },
+                
+                // For the UI gauges, we can map goodput directly to rxRate
+                rxRate: data.goodputBps || 0,
+                txRate: data.goodputBps || 0,
             };
         }
         case 'WS_ERROR':
