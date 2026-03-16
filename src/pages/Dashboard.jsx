@@ -1,10 +1,9 @@
 import StatusIndicator from '../components/StatusIndicator';
-import TxConfigPanel from '../components/TxConfigPanel';
-import RxConfigPanel from '../components/RxConfigPanel';
 import PayloadDeck from '../components/PayloadDeck';
 import TransmissionQueue from '../components/TransmissionQueue';
 import ReceivingQueue from '../components/ReceivingQueue';
 import TelemetryReport from '../components/TelemetryReport';
+import TransceiverConfigPanel from '../components/TransceiverConfigPanel';
 import { useDevice } from '../context/DeviceContext';
 import { USE_MOCK } from '../services/api';
 
@@ -72,12 +71,11 @@ export default function Dashboard() {
                 {/* Row 1: Status+Gauge | TX Config | RX Config | PayloadDeck */}
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: '220px 1fr 1fr 1fr',
+                    gridTemplateColumns: '0.5fr 1fr  1fr',
                     gap: '20px', minHeight: '320px',
                 }}>
                     <StatusIndicator />
-                    <TxConfigPanel />
-                    <RxConfigPanel />
+                    <TransceiverConfigPanel />
                     <PayloadDeck />
                 </div>
 

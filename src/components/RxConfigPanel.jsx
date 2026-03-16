@@ -71,7 +71,7 @@ export default function RxConfigPanel() {
     }
 
     return (
-        <div className="glass-card p-5 flex flex-col gap-4 h-full">
+        <div className="glass-card p-10 flex flex-col gap-4 h-full">
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{

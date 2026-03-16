@@ -10,11 +10,11 @@
 import axios from 'axios';
 
 // ── Toggle this flag ──────────────────────────────────────────────────────────
-export const USE_MOCK = true;
+export const USE_MOCK = false;
 
 // ── Backend base URL (only used when USE_MOCK = false) ────────────────────────
-const BASE_URL = 'http://localhost:8000';
-const WS_URL = 'ws://localhost:8000/ws';
+const BASE_URL = 'http://localhost:8080';
+const WS_URL = 'ws://localhost:8080/ws';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -47,6 +47,11 @@ function randomMockPacket() {
 // ─────────────────────────────────────────────────────────────────────────────
 // sendPayload — POST /api/transmit
 // ─────────────────────────────────────────────────────────────────────────────
+// curl -X POST "http://localhost:8080/send_file" \
+//      -H "accept: application/json" \
+//      -H "Content-Type: multipart/form-data" \
+//      -F "file=@coffee-resized.jpg"
+
 export async function sendPayload(file) {
     if (USE_MOCK) {
         await delay(1200);
@@ -55,19 +60,32 @@ export async function sendPayload(file) {
             err.response = { status: 500, data: { message: 'Signal lost during transmission (mock)' } };
             throw err;
         }
-        return { status: 200, data: { message: `File "${file.name}" transmitted successfully (mock)`, bytes: file.size, ack: Math.random() > 0.1 } };
+        return { 
+            status: 200, 
+            data: { message: `File "${file.name}" transmitted successfully (mock)`, bytes: file.size, ack: Math.random() > 0.1 } 
+        };
     }
 
     const formData = new FormData();
-    formData.append('file', file);
-    return axios.post(`${BASE_URL}/api/transmit`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+    // Matches the -F "file=@coffee-resized.jpg"
+    formData.append('file', file); 
+
+    // Assuming BASE_URL is set to "http://localhost:8080"
+    return axios.post(`${BASE_URL}/send_file`, formData, {
+        headers: { 
+            'Content-Type': 'multipart/form-data',
+            'accept': 'application/json' // Added to match the cURL headers
+        },
     });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // sendMessage — POST /api/transmit  (text payload)
 // ─────────────────────────────────────────────────────────────────────────────
+// curl -X POST "http://127.0.0.1:8080/send_text" \
+//      -H "Content-Type: application/x-www-form-urlencoded" \
+//      -d "message=Hello HackRF World"
+
 export async function sendMessage(text) {
     if (USE_MOCK) {
         await delay(800);
@@ -76,46 +94,37 @@ export async function sendMessage(text) {
             err.response = { status: 500, data: { message: 'Channel collision detected (mock)' } };
             throw err;
         }
-        return { status: 200, data: { message: 'Message transmitted (mock)', bytes: new Blob([text]).size, ack: Math.random() > 0.1 } };
+        return { 
+            status: 200, 
+            data: { message: 'Message transmitted (mock)', bytes: new Blob([text]).size, ack: Math.random() > 0.1 } 
+        };
     }
 
-    return axios.post(`${BASE_URL}/api/transmit`, { message: text }, {
-        headers: { 'Content-Type': 'application/json' },
+    // Prepare the data natively as x-www-form-urlencoded
+    const params = new URLSearchParams();
+    params.append('message', text);
+
+    // Assuming BASE_URL is "http://127.0.0.1:8080"
+    return axios.post(`${BASE_URL}/send_text`, params, {
+        headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded' 
+        },
     });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// updateTxConfig — PUT /api/tx-config
-// ─────────────────────────────────────────────────────────────────────────────
-export async function updateTxConfig(json) {
+// PUT /api/config
+export async function updateConfig(json) {
     if (USE_MOCK) {
         await delay(500);
         if (Math.random() < 0.08) {
-            const err = new Error('Mock TX config error');
-            err.response = { status: 400, data: { message: 'TX gain out of range 0–47 dB (mock)' } };
+            const err = new Error('Mock config error');
+            err.response = { status: 400, data: { message: 'Configuration validation failed (mock)' } };
             throw err;
         }
-        return { status: 200, data: { message: 'TX configuration applied (mock)', config: json } };
+        return { status: 200, data: { message: 'Configuration applied to radio.conf (mock)', config: json } };
     }
-    return axios.put(`${BASE_URL}/api/tx-config`, json);
+    return axios.put(`${BASE_URL}/api/config`, json);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// updateRxConfig — PUT /api/rx-config
-// ─────────────────────────────────────────────────────────────────────────────
-export async function updateRxConfig(json) {
-    if (USE_MOCK) {
-        await delay(500);
-        if (Math.random() < 0.08) {
-            const err = new Error('Mock RX config error');
-            err.response = { status: 400, data: { message: 'LNA gain must be a multiple of 8 (mock)' } };
-            throw err;
-        }
-        return { status: 200, data: { message: 'RX configuration applied (mock)', config: json } };
-    }
-    return axios.put(`${BASE_URL}/api/rx-config`, json);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // connectWebSocket
 // ─────────────────────────────────────────────────────────────────────────────
