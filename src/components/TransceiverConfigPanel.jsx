@@ -13,7 +13,7 @@ const SHARED_FIELDS =[
 
 const TX_FIELDS =[
     { key: 'tx_gain', label: 'TX Gain', unit: 'dB', min: 0, max: 47, step: 1 },
-    { key: 'chunk_size', label: 'Chunk Size', unit: 'B', min: 16, max: 8192, step: 16 },
+    { key: 'chunk_size', label: 'Chunk Size', unit: 'B', min: 16, max: 1000000, step: 8 },
     { key: 'max_resend', label: 'Max Resend', unit: '', min: 0, max: 10, step: 1 },
     { key: 'trans_count', label: 'Trans Count', unit: '', min: 1, max: 100, step: 1 },
 ];
@@ -24,28 +24,27 @@ const RX_FIELDS =[
 ];
 
 export default function TransceiverConfigPanel() {
-    const { txConfig, rxConfig, setTxConfig, setRxConfig, addLog } = useDevice();
+    const { config, setConfig, addLog } = useDevice();
     const { addToast } = useToast();
     // 2. Initialize with your EXACT radio.conf defaults if context is empty
     const [vals, setVals] = useState({
-        // Shared (Note: 2300000000 Hz = 2300 MHz, 2000000 Hz = 2 Msps)
-        frequency: String(txConfig?.frequency || '2300'),
-        sample_rate: String(txConfig?.sample_rate || '2'),
-        samples_per_symbol: String(txConfig?.samples_per_symbol || '50'),
-        timeout: String(txConfig?.timeout || '10'),
-        modulation: txConfig?.modulation || 'OFDM',
+        frequency: String(config?.frequency || ''),
+        sample_rate: String(config?.sample_rate || ''),
+        samples_per_symbol: String(config?.samples_per_symbol || ''),
+        timeout: String(config?.timeout || ''),
+        modulation_method: config?.modulation_method || '',
         
         // TX
-        txSerial: txConfig?.txSerial || '0000000000000000f77c60dc29417dc3',
-        tx_gain: String(txConfig?.tx_gain || '30'),
-        chunk_size: String(txConfig?.chunk_size || '2048'),
-        max_resend: String(txConfig?.max_resend || '5'),
-        trans_count: String(txConfig?.trans_count || '5'),
+        tx_serial: config?.tx_serial || '',
+        tx_gain: String(config?.tx_gain || ''),
+        chunk_size: String(config?.chunk_size || ''),
+        max_resend: String(config?.max_resend || ''),
+        trans_count: String(config?.trans_count || ''),
         
         // RX
-        rxSerial: rxConfig?.rxSerial || '000000000000000075b068dc30792007',
-        rx_gain: String(rxConfig?.rx_gain || '20'),
-        capture_seconds: String(rxConfig?.capture_seconds || '2'),
+        rx_serial: config?.rx_serial || '',
+        rx_gain: String(config?.rx_gain || ''),
+        capture_seconds: String(config?.capture_seconds || ''),
     });
 
     const [errors, setErrors] = useState({});
@@ -63,33 +62,29 @@ export default function TransceiverConfigPanel() {
       console.log(typeof data)
       
       setVals(prev => {
-        // Start with previous values as base (safety net)
-        // Then override with server data
-        // Finally ensure EVERY field used in the form is a string (never undefined)
         return {
           // Shared
-          frequency:           String(parseInt(data.frequency,10) / (1000000)           ?? '2322'),
-          sample_rate:         String(parseInt(data.sample_rate,10) / (1000000)        ?? prev.sample_rate ?? '2'),
-          samples_per_symbol:  String(data.samples_per_symbol  ?? prev.samples_per_symbol  ?? '50'),
-          timeout:             String(data.timeout             ?? prev.timeout             ?? '10'),
-          modulation:          String(data.modulation          ?? prev.modulation          ?? 'OFDM'),
+          frequency:           String(parseInt(data.frequency,10) / (1000000)),
+          sample_rate:         String(parseInt(data.sample_rate,10) / (1000000)),
+          samples_per_symbol:  String(data.samples_per_symbol),
+          timeout:             String(data.timeout),
+          modulation_method:          String(data.modulation_method),
 
           // TX
-          txSerial:            String(data.txSerial            ?? prev.txSerial            ?? '0000000000000000f77c60dc29417dc3'),
-          tx_gain:             String(data.tx_gain             ?? prev.tx_gain             ?? '30'),
-          chunk_size:          String(data.chunk_size          ?? prev.chunk_size          ?? '2048'),
-          max_resend:          String(data.max_resend          ?? prev.max_resend          ?? '5'),
-          trans_count:         String(data.trans_count         ?? prev.trans_count         ?? '5'),
+          tx_serial:            String(data.tx_serial),
+          tx_gain:             String(data.tx_gain),
+          chunk_size:          String(data.chunk_size),
+          max_resend:          String(data.max_resend),
+          trans_count:         String(data.trans_count),
 
           // RX
-          rxSerial:            String(data.rxSerial            ?? prev.rxSerial            ?? '000000000000000075b068dc30792007'),
-          rx_gain:             String(data.rx_gain             ?? prev.rx_gain             ?? '20'),
-          capture_seconds:     String(data.capture_seconds     ?? prev.capture_seconds     ?? '2'),
+          rx_serial:            String(data.rx_serial),
+          rx_gain:             String(data.rx_gain),
+          capture_seconds:     String(data.capture_seconds),
         };
       });
     } catch (err) {
       console.log(`ERROR: Fetching Radio.conf ${err}`);
-      // Optionally show toast / keep old values
     }
   };
 
@@ -124,15 +119,15 @@ export default function TransceiverConfigPanel() {
             sample_rate: parseFloat(vals.sample_rate),
             samples_per_symbol: parseInt(vals.samples_per_symbol, 10),
             timeout: parseInt(vals.timeout, 10),
-            modulation: vals.modulation,
+            modulation_method: vals.modulation_method,
             
-            txSerial: vals.txSerial.trim(),
+            tx_serial: vals.tx_serial.trim(),
             tx_gain: parseInt(vals.tx_gain, 10),
             chunk_size: parseInt(vals.chunk_size, 10),
             max_resend: parseInt(vals.max_resend, 10),
             trans_count: parseInt(vals.trans_count, 10),
             
-            rxSerial: vals.rxSerial.trim(),
+            rx_serial: vals.rx_serial.trim(),
             rx_gain: parseInt(vals.rx_gain, 10),
             capture_seconds: parseInt(vals.capture_seconds, 10),
         };
@@ -141,17 +136,17 @@ export default function TransceiverConfigPanel() {
             await updateConfig(payload);
             
             // Update Context to reflect changes across the app
-            setTxConfig(p => ({
-                ...p, frequency: payload.frequency, sample_rate: payload.sample_rate, samples_per_symbol: payload.samples_per_symbol, timeout: payload.timeout,
-                modulation: payload.modulation, tx_gain: payload.tx_gain, chunk_size: payload.chunk_size, 
-                max_resend: payload.max_resend, trans_count: payload.trans_count, txSerial: payload.txSerial
-            }));
+            // setconfig(p => ({
+            //     ...p, frequency: payload.frequency, sample_rate: payload.sample_rate, samples_per_symbol: payload.samples_per_symbol, timeout: payload.timeout,
+            //     modulation_method: payload.modulation_method, tx_gain: payload.tx_gain, chunk_size: payload.chunk_size, 
+            //     max_resend: payload.max_resend, trans_count: payload.trans_count, tx_serial: payload.tx_serial
+            // }));
             
-            setRxConfig(p => ({
-                ...p, frequency: payload.frequency, sample_rate: payload.sample_rate, samples_per_symbol: payload.samples_per_symbol, timeout: payload.timeout,
-                modulation: payload.modulation, rx_gain: payload.rx_gain, capture_seconds: payload.capture_seconds, rxSerial: payload.rxSerial
-            }));
-
+            // setconfig(p => ({
+            //     ...p, frequency: payload.frequency, sample_rate: payload.sample_rate, samples_per_symbol: payload.samples_per_symbol, timeout: payload.timeout,
+            //     modulation_method: payload.modulation_method, rx_gain: payload.rx_gain, capture_seconds: payload.capture_seconds, rx_serial: payload.rx_serial
+            // }));
+            setConfig(payload)
             addToast(`Transceiver config saved — ${vals.frequency} MHz`, 'success');
             addLog(`Config updated → freq: ${vals.frequency} MHz, TX Gain: ${vals.tx_gain} dB, RX Gain: ${vals.rx_gain} dB`);
         } catch (err) {
@@ -202,8 +197,8 @@ export default function TransceiverConfigPanel() {
                                     value={vals[f.key]} onChange={(e) => handleChange(f.key, e.target.value)} />
                             </Field>
                         ))}
-                        <Field label="Modulation" unit="" error={errors.modulation}>
-                            <select className="input-field" value={vals.modulation} onChange={(e) => handleChange('modulation', e.target.value)}>
+                        <Field label="Modulation" unit="" error={errors.modulation_method}>
+                            <select className="input-field" value={vals.modulation_method} onChange={(e) => handleChange('modulation_method', e.target.value)}>
                                 <option value="QPSK">QPSK</option>
                                 <option value="BPSK">BPSK</option>
                                 <option value="OFDM">OFDM</option>
@@ -225,9 +220,9 @@ export default function TransceiverConfigPanel() {
                     </div>
                     {/* Full width for serials */}
                     <div style={{ marginTop: 12 }}>
-                        <Field label="TX Serial" unit="" error={errors.txSerial}>
+                        <Field label="TX Serial" unit="" error={errors.tx_serial}>
                             <input className="input-field" type="text" placeholder="Hardware TX Serial"
-                                value={vals.txSerial} onChange={(e) => handleChange('txSerial', e.target.value)} />
+                                value={vals.tx_serial} onChange={(e) => handleChange('tx_serial', e.target.value)} />
                         </Field>
                     </div>
                 </div>
@@ -245,9 +240,9 @@ export default function TransceiverConfigPanel() {
                     </div>
                     {/* Full width for serials */}
                     <div style={{ marginTop: 12 }}>
-                        <Field label="RX Serial" unit="" error={errors.rxSerial}>
+                        <Field label="RX Serial" unit="" error={errors.rx_serial}>
                             <input className="input-field" type="text" placeholder="Hardware RX Serial"
-                                value={vals.rxSerial} onChange={(e) => handleChange('rxSerial', e.target.value)} />
+                                value={vals.rx_serial} onChange={(e) => handleChange('rx_serial', e.target.value)} />
                         </Field>
                     </div>
                 </div>

@@ -8,7 +8,7 @@ import { useDevice } from '../context/DeviceContext';
 import { USE_MOCK } from '../services/api';
 
 export default function Dashboard() {
-    const { txConfig, rxConfig } = useDevice();
+    const { config } = useDevice();
 
     return (
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
@@ -43,13 +43,16 @@ export default function Dashboard() {
 
                     {/* Pills */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <Pill label="TX Freq" value={`${txConfig.frequency} MHz`} color="#3b82f6" />
-                        <Pill label="TX Gain" value={`${txConfig.gain} dB`} color="#3b82f6" />
+                        <Pill label="TX Freq" value={`${config.frequency} MHz`} color="#3b82f6" />
+                        <Pill label="TX Gain" value={`${config.tx_gain} dB`} color="#3b82f6" />
                         <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
-                        <Pill label="RX Freq" value={`${rxConfig.frequency} MHz`} color="#22c55e" />
-                        <Pill label="LNA" value={`${rxConfig.lnaGain} dB`} color="#22c55e" />
-                        {txConfig.serial && (
-                            <Pill label="Serial" value={txConfig.serial.slice(0, 8) + '…'} color="#a855f7" />
+                        <Pill label="RX Freq" value={`${config.frequency} MHz`} color="#22c55e" />
+                        <Pill label="RX Gain" value={`${config.rx_gain} dB`} color="#22c55e" />
+                        {config.tx_serial && (
+                            <Pill label="TX SERIAL" value={config.tx_serial.slice(0, 8) + '…'} color="#a855f7" />
+                        )}
+                        {config.rx_serial && (
+                            <Pill label="RX SERIAL" value={config.rx_serial.slice(0, 8) + '…'} color="#a855f7" />
                         )}
                         {USE_MOCK && (
                             <span style={{

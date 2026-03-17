@@ -14,10 +14,24 @@ const initialState = {
     deviceId: null,
     logLines: [],
     connected: false,
-    // TX config (HackRF transmit side)
-    txConfig: { frequency: 977, gain: 20, sampleRate: 2, serial: '', sps: 8, chunkSize: 256, maxResend: 3, modulation: 'QPSK', transCount: 1 },
-    // RX config (HackRF receive side)
-    rxConfig: { frequency: 433, lnaGain: 16, vgaGain: 20, sampleRate: 2, captureSeconds: 10, sps: 8, modulation: 'QPSK' },
+    //Config
+    config: {
+        frequency: 0.0,
+        sample_rate: 0,
+        samples_per_symbol: 0,
+        timeout: 0,
+        modulation_method: 'QPSK',
+        
+        tx_serial: '',
+        tx_gain: 0,
+        chunk_size: 0,
+        max_resend: 0,
+        trans_count: 0,
+        
+        rx_serial: '',
+        rx_gain: 0,
+        capture_seconds: 0,
+    },
     // Queues
     txQueue: [],         // { id, name, size, status, timestamp }
     rxQueue: [],         // { id, device_id, bytes, timestamp, status }
@@ -44,7 +58,7 @@ let _queueId = 1;
 function reducer(state, action) {
     switch (action.type) {
         case 'WS_PACKET': {
-            const data = action.payload; // This is the dictionary from Python
+            const data = action.payload;
             console.log(data)
             // Log activity to the UI terminal
             const logMsg = `[${data.timestamp}] Telemetry update: ${data.goodputKbps} kbps, PDR: ${data.pdr}%`;
@@ -73,8 +87,8 @@ function reducer(state, action) {
                 },
                 
                 // For the UI gauges, we can map goodput directly to rxRate
-                rxRate: data.goodputBps || 0,
-                txRate: data.goodputBps || 0,
+                rxRate: data.goodputKbps || 0,
+                txRate: data.goodputKbps || 0,
             };
         }
         case 'WS_ERROR':
@@ -87,10 +101,8 @@ function reducer(state, action) {
                     `[${new Date().toLocaleTimeString()}] ⚠ WebSocket error — reconnecting…`,
                 ],
             };
-        case 'SET_TX_CONFIG':
-            return { ...state, txConfig: { ...state.txConfig, ...action.payload } };
-        case 'SET_RX_CONFIG':
-            return { ...state, rxConfig: { ...state.rxConfig, ...action.payload } };
+        case 'SET_CONFIG':
+            return { ...state, config: { ...state.config, ...action.payload } };
         case 'ADD_LOG':
             return {
                 ...state,
@@ -168,8 +180,7 @@ export function DeviceProvider({ children }) {
         return () => wsRef.current?.disconnect();
     }, [onMessage, onError]);
 
-    const setTxConfig = useCallback((cfg) => dispatch({ type: 'SET_TX_CONFIG', payload: cfg }), []);
-    const setRxConfig = useCallback((cfg) => dispatch({ type: 'SET_RX_CONFIG', payload: cfg }), []);
+    const setConfig = useCallback((cfg) => dispatch({ type: 'SET_CONFIG', payload: cfg }), []);
     const addLog = useCallback((line) => dispatch({ type: 'ADD_LOG', line: `[${new Date().toLocaleTimeString()}] ${line}` }), []);
     const txAdd = useCallback((name, size) => { const id = Date.now() + Math.random(); dispatch({ type: 'TX_ADD', name, size, id }); return id; }, []);
     const txUpdate = useCallback((id, status, ack) => dispatch({ type: 'TX_UPDATE', id, status, ack }), []);
@@ -180,7 +191,7 @@ export function DeviceProvider({ children }) {
 
 
     return (
-        <DeviceContext.Provider value={{ ...state, setTxConfig, setRxConfig, addLog, txAdd, txUpdate, clearRx, clearTx, clearLog, resetTelemetry }}>
+        <DeviceContext.Provider value={{ ...state, setConfig, addLog, txAdd, txUpdate, clearRx, clearTx, clearLog, resetTelemetry }}>
 
             {children}
         </DeviceContext.Provider>
