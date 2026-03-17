@@ -115,8 +115,8 @@ export default function TransceiverConfigPanel() {
         setLoading(true);
         // Build payload targeting exactly what the backend needs
         const payload = {
-            frequency: parseFloat(vals.frequency),
-            sample_rate: parseFloat(vals.sample_rate),
+            frequency: parseFloat(vals.frequency * 1000000),
+            sample_rate: parseFloat(vals.sample_rate * 1000000),
             samples_per_symbol: parseInt(vals.samples_per_symbol, 10),
             timeout: parseInt(vals.timeout, 10),
             modulation_method: vals.modulation_method,
