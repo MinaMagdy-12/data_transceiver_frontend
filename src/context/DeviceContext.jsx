@@ -31,6 +31,10 @@ const initialState = {
         rx_serial: '',
         rx_gain: 0,
         capture_seconds: 0,
+
+        reset_timeout : 0,
+        reed_solo_size : 0,
+        padding_size : 0
     },
     // Queues
     txQueue: [],         // { id, name, size, status, timestamp }
