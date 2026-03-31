@@ -117,7 +117,14 @@ export async function updateConfig(json) {
         }
         return { status: 200, data: { message: 'Configuration applied to radio.conf (mock)', config: json } };
     }
-    return axios.put(`${BASE_URL}/api/config`, json);
+    
+    // Explicitly sending the headers guarantees the backend receives it as raw JSON data
+    return axios.put(`${BASE_URL}/api/config`, json, {
+        headers: {
+            'Content-Type': 'application/json',
+            'accept': 'application/json'
+        }
+    });
 }
 // ─────────────────────────────────────────────────────────────────────────────
 // connectWebSocket

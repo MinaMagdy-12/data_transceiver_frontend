@@ -9,6 +9,10 @@ const SHARED_FIELDS =[
     { key: 'sample_rate', label: 'Sample Rate', unit: 'Msps', min: 0.1, max: 20, step: 0.1 },
     { key: 'samples_per_symbol', label: 'Samples/Symbol', unit: '', min: 1, max: 1024, step: 1 },
     { key: 'timeout', label: 'Timeout', unit: 's', min: 1, max: 120, step: 1 },
+    // NEW FIELDS ADDED HERE
+    { key: 'reset_timeout', label: 'Reset Timeout', unit: 's', min: 0, max: 120, step: 1 },
+    { key: 'reed_solo_size', label: 'Reed Solo Size', unit: 'B', min: 0, max: 255, step: 1 },
+    { key: 'padding_size', label: 'Padding Size', unit: 'B', min: 0, max: 20000000, step: 1 },
 ];
 
 const TX_FIELDS =[
@@ -26,13 +30,17 @@ const RX_FIELDS =[
 export default function TransceiverConfigPanel() {
     const { config, setConfig, addLog } = useDevice();
     const { addToast } = useToast();
-    // 2. Initialize with your EXACT radio.conf defaults if context is empty
+    
+    // 2. Initialize with your EXACT radio.conf defaults
     const [vals, setVals] = useState({
         frequency: String(config?.frequency || ''),
         sample_rate: String(config?.sample_rate || ''),
         samples_per_symbol: String(config?.samples_per_symbol || ''),
         timeout: String(config?.timeout || ''),
         modulation_method: config?.modulation_method || '',
+        reset_timeout: String(config?.reset_timeout || ''),
+        reed_solo_size: String(config?.reed_solo_size || ''),
+        padding_size: String(config?.padding_size || ''),
         
         // TX
         tx_serial: config?.tx_serial || '',
@@ -51,45 +59,48 @@ export default function TransceiverConfigPanel() {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-  const fetchData = async () => {
-    try {
-      const response = await fetch('http://localhost:8080/api/config_init');
-      console.log(response.status)
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
-      let data = await response.json();
-      data = JSON.parse(data);
-      console.log(typeof data)
-      
-      setVals(prev => {
-        return {
-          // Shared
-          frequency:           String(parseInt(data.frequency,10) / (1000000)),
-          sample_rate:         String(parseInt(data.sample_rate,10) / (1000000)),
-          samples_per_symbol:  String(data.samples_per_symbol),
-          timeout:             String(data.timeout),
-          modulation_method:          String(data.modulation_method),
+        const fetchData = async () => {
+            try {
+                const response = await fetch('http://localhost:8080/api/config_init');
+                console.log(response.status)
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                let data = await response.json();
+                data = JSON.parse(data);
+                console.log(typeof data)
+                
+                setVals(prev => {
+                    return {
+                        // Shared
+                        frequency:           String(parseInt(data.frequency,10) / 1000000),
+                        sample_rate:         String(parseInt(data.sample_rate,10) / 1000000),
+                        samples_per_symbol:  String(data.samples_per_symbol),
+                        timeout:             String(data.timeout),
+                        modulation_method:   String(data.modulation_method),
+                        reset_timeout:       String(data.reset_timeout),
+                        reed_solo_size:      String(data.reed_solo_size),
+                        padding_size:        String(data.padding_size),
 
-          // TX
-          tx_serial:            String(data.tx_serial),
-          tx_gain:             String(data.tx_gain),
-          chunk_size:          String(data.chunk_size),
-          max_resend:          String(data.max_resend),
-          trans_count:         String(data.trans_count),
+                        // TX
+                        tx_serial:           String(data.tx_serial),
+                        tx_gain:             String(data.tx_gain),
+                        chunk_size:          String(data.chunk_size),
+                        max_resend:          String(data.max_resend),
+                        trans_count:         String(data.trans_count),
 
-          // RX
-          rx_serial:            String(data.rx_serial),
-          rx_gain:             String(data.rx_gain),
-          capture_seconds:     String(data.capture_seconds),
+                        // RX
+                        rx_serial:           String(data.rx_serial),
+                        rx_gain:             String(data.rx_gain),
+                        capture_seconds:     String(data.capture_seconds),
+                    };
+                });
+            } catch (err) {
+                console.log(`ERROR: Fetching Radio.conf ${err}`);
+            }
         };
-      });
-    } catch (err) {
-      console.log(`ERROR: Fetching Radio.conf ${err}`);
-    }
-  };
 
-  fetchData();
-}, []);
+        fetchData();
+    }, []);
 
     function validate() {
         const errs = {};
@@ -115,11 +126,14 @@ export default function TransceiverConfigPanel() {
         setLoading(true);
         // Build payload targeting exactly what the backend needs
         const payload = {
-            frequency: parseFloat(vals.frequency * 1000000),
-            sample_rate: parseFloat(vals.sample_rate * 1000000),
+            frequency: parseFloat(vals.frequency) * 1000000,
+            sample_rate: parseFloat(vals.sample_rate) * 1000000,
             samples_per_symbol: parseInt(vals.samples_per_symbol, 10),
             timeout: parseInt(vals.timeout, 10),
             modulation_method: vals.modulation_method,
+            reset_timeout: parseInt(vals.reset_timeout, 10),
+            reed_solo_size: parseInt(vals.reed_solo_size, 10),
+            padding_size: parseInt(vals.padding_size, 10),
             
             tx_serial: vals.tx_serial.trim(),
             tx_gain: parseInt(vals.tx_gain, 10),
@@ -135,18 +149,7 @@ export default function TransceiverConfigPanel() {
         try {
             await updateConfig(payload);
             
-            // Update Context to reflect changes across the app
-            // setconfig(p => ({
-            //     ...p, frequency: payload.frequency, sample_rate: payload.sample_rate, samples_per_symbol: payload.samples_per_symbol, timeout: payload.timeout,
-            //     modulation_method: payload.modulation_method, tx_gain: payload.tx_gain, chunk_size: payload.chunk_size, 
-            //     max_resend: payload.max_resend, trans_count: payload.trans_count, tx_serial: payload.tx_serial
-            // }));
-            
-            // setconfig(p => ({
-            //     ...p, frequency: payload.frequency, sample_rate: payload.sample_rate, samples_per_symbol: payload.samples_per_symbol, timeout: payload.timeout,
-            //     modulation_method: payload.modulation_method, rx_gain: payload.rx_gain, capture_seconds: payload.capture_seconds, rx_serial: payload.rx_serial
-            // }));
-            setConfig(payload)
+            setConfig(payload);
             addToast(`Transceiver config saved — ${vals.frequency} MHz`, 'success');
             addLog(`Config updated → freq: ${vals.frequency} MHz, TX Gain: ${vals.tx_gain} dB, RX Gain: ${vals.rx_gain} dB`);
         } catch (err) {
